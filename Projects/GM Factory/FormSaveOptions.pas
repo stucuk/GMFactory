@@ -19,6 +19,8 @@ type
     Button2: TButton;
     Button1: TButton;
     Timer: TTimer;
+    IsUnitCheck: TCheckBox;
+    UnitFallCheck: TCheckBox;
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -26,6 +28,7 @@ type
     procedure HasSideColsClick(Sender: TObject);
     procedure TimerTimer(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure IsUnitCheckClick(Sender: TObject);
   private
     { Private declarations }
     procedure UpdatePreview(Full : Boolean);
@@ -65,6 +68,7 @@ end;
 procedure TFrmSaveOptions.FormShow(Sender: TObject);
 begin
  O := False;
+ UnitFallCheck.Enabled := IsUnitCheck.Checked;
 end;
 
 procedure TFrmSaveOptions.FormCreate(Sender: TObject);
@@ -114,7 +118,7 @@ var
 begin
  if Full then
  begin
-  GMFPal := TheGMF.MakePalette(HasSideCols.Checked);
+  GMFPal := TheGMF.MakePalette(HasSideCols.Checked,IsUnitCheck.Checked,UnitFallCheck.Checked);
 
   for X := 0 to 255 do
   ThePalette[X] := GMFPal[X];
@@ -202,6 +206,13 @@ procedure TFrmSaveOptions.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
  Timer.Enabled := False;
+end;
+
+procedure TFrmSaveOptions.IsUnitCheckClick(Sender: TObject);
+begin
+ UpdatePreview(True);
+
+ UnitFallCheck.Enabled := IsUnitCheck.Checked;
 end;
 
 end.

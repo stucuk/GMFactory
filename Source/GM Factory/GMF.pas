@@ -46,6 +46,8 @@ GMF_ID  : TGMFID = ('G','M','F',Char(GMF_VER));
  ZBuffers
  RGB16
  Trans
+ FrameExtraDataHeader
+ FrameExtraData
 }
 
 type
@@ -79,12 +81,14 @@ end;
 PGMFLayer = ^TGMFLayer;
 
 TGMFFrame = Record
- Layers   : PGMFLayer; // Always at least 2 layers. Layer 0 is the fully composed image.
- Count    : Byte;
- Edited   : Boolean;//True if Layer 0 needs to be updated.
- Selected : Byte; //EDITOR
+ Layers        : PGMFLayer; // Always at least 2 layers. Layer 0 is the fully composed image.
+ Count         : Byte;
+ Edited        : Boolean;//True if Layer 0 needs to be updated.
+ Selected      : Byte; //EDITOR
  SideCol,
- ZBuff    : PByte;
+ ZBuff         : PByte;
+ ExtraData     : Pointer;
+ ExtraDataSize : Word;
 end;
 PGMFFrame = ^TGMFFrame;
 
@@ -102,6 +106,7 @@ protected
  function GetFrame(Index : Integer) : PGMFFrame;
  function GetFrameCount : Integer;
  procedure UpdateLayer0(Frame : PGMFFrame);
+ function ResizeBuffer(Buffer : Pointer; NewLeft,NewTop,NewRight,NewBottom,NewW,NewH : Integer; BufSize : Byte) : Pointer;
 public
  constructor Create(Width, Height : Word);  overload;
  constructor Create(Filename : AnsiString; OneFrame : Boolean = False); overload;
@@ -115,7 +120,8 @@ public
  procedure LoadFromStream(Stream : TStream);
  procedure SaveToStream(Stream : TStream);
 
- procedure Resize(Width,Height : Word);
+ //procedure Resize(Width,Height : Word);
+ procedure Resize(NewLeft,NewTop,NewRight,NewBottom : Integer);
 
  procedure AddFrame(Count : Integer);
  procedure InsertFrame(Index : Integer; Count : Integer);
@@ -129,6 +135,7 @@ public
 
  procedure LayerToPNG(Frame : PGMFFrame; PNG : TPNGObject; Index : Byte);
  procedure SideColToPNG(Frame : PGMFFrame; PNG : TPNGObject);
+ procedure SideColToPNG_Actual(Frame : PGMFFrame; PNG : TPNGObject);
  procedure ZBuffToPNG(Frame : PGMFFrame; PNG : TPNGObject);
  procedure FrameToPNG(Frame : PGMFFrame; PNG : TPNGObject);
 
@@ -137,8 +144,9 @@ public
  procedure CopyLayer(Dest : PGMFLayer; RGB16 : PWord; Trans : PByte);
  procedure AddLayerToLayer(Dest,Source : PGMFLayer);
 
- function MakePalette(UseSideCols : Boolean) : TGMFPalette;
+ function MakePalette(UseSideCols,IsUnit,HasHair : Boolean) : TGMFPalette;
  function GetFrameWithPalette(Frame : PGMFFrame; const Palette : TGMFPalette; UseSideCols : Boolean) : PByte;
+ function GetFrameRGB(Frame : PGMFFrame) : PRGBTriple;
 
  property Width  : Word read FW;
  property Height : Word read FH;
@@ -199,6 +207,12 @@ begin
   if Assigned(Frame.ZBuff) then
   FreeMem(Frame.ZBuff);
   Frame.ZBuff := Nil;
+
+  if Assigned(Frame.ExtraData) then
+  FreeMem(Frame.ExtraData);
+  Frame.ExtraData := Nil;
+
+  Frame.ExtraDataSize := 0;
 
   FreeMem(Frame);
 end;
@@ -277,6 +291,11 @@ var
  ALayer : PGMFLayer;
  FC,LC,
  AFLC   : Integer;
+
+ EDH,
+ EDHT   : PWord;
+ EDC    : Integer;
+ ED,EDT : Pointer;
 begin
  Clear;
 
@@ -336,6 +355,20 @@ begin
  if OneFrame then
  Stream.Seek(WH*(Header.LayerCount-1),soFromCurrent);
 
+ if not OneFrame and not (Stream.Position >= Stream.Size) then
+ begin
+  GetMem(EDH,SizeOf(Word)*FC);
+  Stream.Read(EDH^,SizeOf(Word)*FC);
+  Stream.Read(EDC,SizeOf(Integer));
+  GetMem(ED,EDC);
+  Stream.Read(ED^,EDC);
+ end
+ else
+ begin
+  EDH := Nil;
+  ED  := Nil;
+ end;
+
  FRH := Frames;
  LAH := Layers;
 
@@ -344,10 +377,29 @@ begin
  R16 := RGB16;
  TR  := Trans;
 
+ EDT := ED;
+ EDHT := EDH;
+
  for F := 0 to FFrames.Count-1 do
  begin
   AFrame := Frame[F];
   AFrame.Selected := FRH.Selected;
+
+  AFrame.ExtraDataSize := 0;
+
+  if not OneFrame then
+  if Assigned(EDH) then
+  begin
+   if (EDHT^ > 0) then
+   begin
+    AFrame.ExtraDataSize := EDHT^;
+    GetMem(AFrame.ExtraData,AFrame.ExtraDataSize);
+    CopyMemory(AFrame.ExtraData,EDT,AFrame.ExtraDataSize);
+    Inc(Cardinal(EDT),AFrame.ExtraDataSize);
+   end;
+   Inc(Cardinal(EDHT),2);
+  end;
+
   if not OneFrame then
   AddLayer(AFrame,FRH.Count-1);
 
@@ -395,6 +447,11 @@ begin
  FreeMem(ZBuffers);
  FreeMem(RGB16);
  FreeMem(Trans);
+
+ if Assigned(EDH) then
+ FreeMem(EDH);
+ if Assigned(ED) then
+ FreeMem(ED);
 end;
 
 procedure TGMF.SaveToStream(Stream : TStream);
@@ -415,6 +472,10 @@ var
 
  AFrame : PGMFFrame;
  ALayer : PGMFLayer;
+ EDH,
+ EDHT   : PWord;
+ EDC    : Integer;
+ ED,EDT : Pointer;
 begin
  Header.ID         := GMF_ID;
  Header.Width      := FW;
@@ -455,6 +516,10 @@ begin
  R16 := RGB16;
  TR  := Trans;
 
+ EDC := 0;
+ GetMem(EDH,SizeOf(Word)*FFrames.Count);
+ EDHT := EDH;
+
  for F := 0 to FFrames.Count-1 do
  begin
   AFrame := Frame[F];
@@ -474,6 +539,10 @@ begin
   FRH.Layer    := (Cardinal(LAH)-Cardinal(Layers)) div SizeOf(TGMFLayerHeader); //ID
 
   Inc(Cardinal(FRH),SizeOf(TGMFFrameHeader));
+
+  EDHT^ := AFrame.ExtraDataSize;
+  Inc(Cardinal(EDHT),SizeOf(Word));
+  Inc(EDC,AFrame.ExtraDataSize);
 
   for L := 0 to AFrame.Count do
   begin
@@ -513,8 +582,110 @@ begin
  FreeMem(RGB16);
  Stream.Write(Trans^,WH*Header.LayerCount);
  FreeMem(Trans);
+
+ if EDC > 0 then
+ begin
+  GetMem(ED,EDC);
+  EDT := ED;
+  for F := 0 to FFrames.Count-1 do
+  begin
+   AFrame := Frame[F];
+   if AFrame.ExtraDataSize > 0 then
+   begin
+    CopyMemory(EDT,AFrame.ExtraData,AFrame.ExtraDataSize);
+    Inc(Cardinal(EDT),AFrame.ExtraDataSize);
+   end;
+  end;
+
+  Stream.Write(EDH^,SizeOf(Word)*FFrames.Count);
+  Stream.Write(EDC,SizeOf(Integer));
+  Stream.Write(ED^,EDC);
+
+  FreeMem(EDH);
+  FreeMem(ED);
+ end;
 end;
 
+function TGMF.ResizeBuffer(Buffer : Pointer; NewLeft,NewTop,NewRight,NewBottom,NewW,NewH : Integer; BufSize : Byte) : Pointer;
+var
+ W,H,
+ Y     : Integer;
+ A,B   : Pointer;
+ LA,LB,
+ TA,TB : Integer;
+begin
+ if not Assigned(Buffer) then
+ begin
+  Result := Nil;
+  Exit;
+ end;
+
+ GetMem(Result,NewW*NewH*BufSize);
+ ZeroMemory(Result,NewW*NewH*BufSize);
+ W := Min(FW,NewW);
+ H := Min(FH,NewH);
+
+ if NewLeft < 0 then
+ begin
+  LA := -NewLeft;
+  LB := 0;
+ end
+ else
+ begin
+  LA := 0;
+  LB := NewLeft;
+ end;
+
+ if NewTop < 0 then
+ begin
+  TA := -NewTop;
+  TB := 0;
+ end
+ else
+ begin
+  TA := 0;
+  TB := NewTop;
+ end;
+
+ for Y := 0 to H-1 do
+ begin
+  A := Pointer(Cardinal(Buffer)+((Y+TA)*FW+LA)*BufSize);
+  B := Pointer(Cardinal(Result)+((Y+TB)*NewW+LB)*BufSize);
+  CopyMemory(B,A,W*BufSize);
+ end;
+
+ FreeMem(Buffer);
+end;
+
+procedure TGMF.Resize(NewLeft,NewTop,NewRight,NewBottom : Integer);
+var
+ NewW,
+ NewH  : Integer;
+ X,L   : Integer;
+ Frame : PGMFFrame;
+ Layer : PGMFLayer;
+begin
+ NewW := FW+NewLeft+NewRight;
+ NewH := FH+NewTop+NewBottom;
+
+ for X := 0 to Self.FrameCount-1 do
+ begin
+  Frame := Self.Frame[X];
+  Frame.SideCol := ResizeBuffer(Frame.SideCol,NewLeft,NewTop,NewRight,NewBottom,NewW,NewH,1);
+  Frame.ZBuff   := ResizeBuffer(Frame.ZBuff,NewLeft,NewTop,NewRight,NewBottom,NewW,NewH,1);
+  Frame.Edited  := True;
+  for L := 0 to Frame.Count do
+  begin
+   Layer       := GetLayer(Frame,L);
+   Layer.Trans := ResizeBuffer(Layer.Trans,NewLeft,NewTop,NewRight,NewBottom,NewW,NewH,1);
+   Layer.RGB16 := ResizeBuffer(Layer.RGB16,NewLeft,NewTop,NewRight,NewBottom,NewW,NewH,2);
+  end;
+ end;
+
+ FW := NewW;
+ FH := NewH;
+end;
+         {
 procedure TGMF.Resize(Width,Height : Word);
 var
  OW,OH : Word;
@@ -524,7 +695,7 @@ begin
  FW := Width;
  FH := Height;
  //TODO
-end;
+end;  }
 
 function TGMF.MakeBlankFrame : PGMFFrame;
 begin
@@ -536,6 +707,8 @@ begin
  Result.SideCol := Nil;
  Result.ZBuff   := Nil;
  Result.Selected := 1;
+ Result.ExtraData := Nil;
+ Result.ExtraDataSize := 0;
 end;
 
 procedure TGMF.AddFrame(Count : Integer);
@@ -605,19 +778,33 @@ var
  Layer : PGMFLayer;
  Y     : Integer;
  L     : Pointer;
+ Fake  : Boolean;
 begin
+ Fake := (FW = 0) and (FH = 0);
+
  BMP := TBitmap.Create;
-  BMP.Width       := FW;
-  BMP.Height      := FH;
+  if Fake then
+  begin
+   BMP.Width  := 1;
+   BMP.Height := 1;
+  end
+  else
+  begin
+   BMP.Width       := FW;
+   BMP.Height      := FH;
+  end;
   BMP.PixelFormat := pf16bit;
 
-  Layer := GetLayer(Frame,Index);
-  SetupLayer(Layer);
-  L := Layer.RGB16;
-  for Y := 0 to FH-1 do
+  if not Fake then
   begin
-   CopyMemory(BMP.ScanLine[Y],L,FW*2);
-   Inc(Cardinal(L),FW*2);
+   Layer := GetLayer(Frame,Index);
+   SetupLayer(Layer);
+   L := Layer.RGB16;
+   for Y := 0 to FH-1 do
+   begin
+    CopyMemory(BMP.ScanLine[Y],L,FW*2);
+    Inc(Cardinal(L),FW*2);
+   end;
   end;
 
   PNG.Assign(BMP);
@@ -625,12 +812,15 @@ begin
 
  if PNG.AlphaScanline[0] = Nil then
  PNG.CreateAlpha;
-                        
- L := Layer.Trans;
- for Y := 0 to FH-1 do
+
+ if not Fake then
  begin
-  CopyMemory(PNG.AlphaScanline[Y],L,FW);
-  Inc(Cardinal(L),FW);
+  L := Layer.Trans;
+  for Y := 0 to FH-1 do
+  begin
+   CopyMemory(PNG.AlphaScanline[Y],L,FW);
+   Inc(Cardinal(L),FW);
+  end;
  end;
 end;
 
@@ -681,6 +871,66 @@ begin
      TRGBTriple(SL^) := SetRGBTriple(MakeGrayDarker(Word(RGB^)));
     Inc(Cardinal(SL),3);
     Inc(Cardinal(RGB),2);
+    if Assigned(L) then
+    Inc(Cardinal(L),1);
+   end;
+  end;
+
+  PNG.Assign(BMP);
+ BMP.Free;
+
+ if PNG.AlphaScanline[0] = Nil then
+ PNG.CreateAlpha;
+
+ L := GetLayer(Frame,0).Trans;
+
+ for Y := 0 to FH-1 do
+ if Assigned(L) then
+ begin
+  SL := PNG.AlphaScanline[Y];
+  for X := 0 to FW-1 do
+  begin
+   Byte(SL^) := Byte(L^);
+   Inc(Cardinal(SL),1);
+   Inc(Cardinal(L),1);
+  end;
+ end
+ else
+ begin
+  SL := PNG.AlphaScanline[Y];
+  for X := 0 to FW-1 do
+  begin
+   Byte(SL^) := 0;
+   Inc(Cardinal(SL),1);
+  end;
+ end;
+end;
+
+procedure TGMF.SideColToPNG_Actual(Frame : PGMFFrame; PNG : TPNGObject);
+var
+ BMP   : TBitmap;
+ Y,X   : Integer;
+ L     : Pointer;
+ Col   : Word;
+ SL    : Pointer;
+begin
+ BMP := TBitmap.Create;
+  BMP.Width       := FW;
+  BMP.Height      := FH;
+  BMP.PixelFormat := pf24bit;
+
+  L := Frame.SideCol;
+
+  for Y := 0 to FH-1 do
+  begin
+   SL := BMP.ScanLine[Y];
+   for X := 0 to FW-1 do
+   begin
+    if Assigned(L) and (Byte(L^) > 0) then
+     TRGBTriple(SL^) := SetRGBTriple(RGB(0,255,0))
+    else
+     TRGBTriple(SL^) := SetRGBTriple(RGB(0,0,0));
+    Inc(Cardinal(SL),3);
     if Assigned(L) then
     Inc(Cardinal(L),1);
    end;
@@ -859,10 +1109,11 @@ end;
 type
 TRGBTripleArray = Array of TRGBTriple;
 
-procedure AddIfUnique(var Cols : TRGBTripleArray; var Count : Integer; const Col : TRGBTriple);
+procedure AddIfUnique(var Cols : TRGBTripleArray; var Count : Integer; const Col : TRGBTriple; Force : Boolean = False);
 var
  X : Integer;
 begin
+ if not Force then
  for X := 0 to Count-1 do
  if (Cols[X].rgbtBlue = Col.rgbtBlue) and (Cols[X].rgbtGreen = Col.rgbtGreen) and (Cols[X].rgbtRed = Col.rgbtRed) then
  Exit;
@@ -896,7 +1147,7 @@ begin
   end;
 end;
 
-function TGMF.MakePalette(UseSideCols : Boolean) : TGMFPalette;
+function TGMF.MakePalette(UseSideCols,IsUnit,HasHair : Boolean) : TGMFPalette;
 var
  F,C,Y,X : Integer;
  Cols : TRGBTripleArray;
@@ -922,9 +1173,23 @@ begin
  if UseSideCols then
  begin
   for X := 1 to 24 do
-  AddIfUnique(Cols,C,SetRGBTriple(0,X*5,Trunc(((240-8)/8)*X)));
+  AddIfUnique(Cols,C,SetRGBTriple(0,X*5,Trunc(((240-8)/8)*X)),True);
 
   IgnoreC := 25;
+
+  if IsUnit then
+  begin
+   for X := 25 to 48 do
+   AddIfUnique(Cols,C,SetRGBTriple(0,X*5,Trunc(3*X)),True);
+   Inc(IgnoreC,24);
+
+   if HasHair then
+   begin
+    for X := 49 to 168 do
+    AddIfUnique(Cols,C,SetRGBTriple(0,X*2,Trunc(X)),True);
+    Inc(IgnoreC,120);
+   end;
+  end;
  end
  else
  IgnoreC := 1;
@@ -951,6 +1216,8 @@ begin
     AddIfUnique(Cols,C,hicolor_to_color(R16^));
     Inc(Cardinal(R16),2);
     Inc(Cardinal(TR),1);
+
+    if Assigned(SC) then
     Inc(Cardinal(SC),1);
    end;
  end;
@@ -984,6 +1251,16 @@ begin
 
   for Y := 1 to 12 do
   Palette[Y+12] := SetRGBAQuad(120+Trunc((Y-1)*((248-120)/11)),28+Trunc((Y-1)*(100/11)),16+Trunc((Y-1)*(80/11)),0);
+
+  if IsUnit then
+  begin
+   for Y := 1 to 24 do
+   Palette[Y+24] := SetRGBAQuad(8+Trunc((Y-1)*(240/24)),4+Trunc((Y-1)*(188/24)),Trunc((Y-1)*(128/24)),0);
+
+   if HasHair then
+   for Y := 1 to 120 do
+   Palette[Y+24+24] := SetRGBAQuad(Trunc((Y-1)*(48/24)),Trunc((Y-1)*(32/24)),Trunc((Y-1)*(16/24)),0);
+  end;
  end;
 
  for Y := 0 to 255 do
@@ -1085,6 +1362,26 @@ begin
  Result := Best;
 end;
 
+function TGMF.GetFrameRGB(Frame : PGMFFrame) : PRGBTriple;
+var
+ RGB16 : PWord;
+ RGB   : PRGBTriple;
+ X,Y   : Integer;
+begin
+ GetMem(Result,FW*FH*3);
+
+ RGB16 := GetLayer(Frame,0).RGB16;
+ RGB   := Result;
+
+ for Y := 0 to FH-1 do
+ for X := 0 to FW-1 do
+ begin
+  RGB^ := hicolor_to_color(RGB16^);
+  Inc(Cardinal(RGB16),2);
+  Inc(Cardinal(RGB),3);
+ end;
+end;
+
 function TGMF.GetFrameWithPalette(Frame : PGMFFrame; const Palette : TGMFPalette; UseSideCols : Boolean) : PByte;
 var
  X,Y     : Integer;
@@ -1159,12 +1456,25 @@ begin
   end;
  BMP.Free;
 
+ TR := Layer.Trans;
+ R8 := Result;
+ //Preserve Alpha
+ for Y := 0 to FH-1 do
+  for X := 0 to FW-1 do
+  begin
+   if (TR^ = 0) then
+   R8^ := 0;
+   Inc(Cardinal(TR),1);
+   Inc(Cardinal(R8),1);
+  end;
+
  //Set Side Colours
  if UseSideCols then
  begin
   R8  := Result;
   R16 := Layer.RGB16;
   SC  := Frame.SideCol;
+  if Assigned(SC) then
   for Y := 0 to FW*FH-1 do
   begin
    if SC^ > 0 then

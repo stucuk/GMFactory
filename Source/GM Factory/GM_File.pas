@@ -21,7 +21,7 @@
 
 unit GM_File;
 {
- This file is designed to load Original War GM[S,X,Z] files
+ This file is designed to load Original War GM[S,X,Z,A] files
  By: Stucuk
  Date: 2016/10/29
 }
@@ -34,6 +34,9 @@ const
  GM_Type_X = Ord('X');
  GM_Type_S = Ord('S');
  GM_Type_Z = Ord('Z');
+ GM_Type_A = Ord('A');
+ GM_Type_E = Ord('E');
+ GM_Type_Q = Ord('Q');
 
  GM_G      = Ord('G');
  GM_Dot    = Ord('.');
@@ -45,6 +48,7 @@ TGM_Frame = Record
  RawDataSize   : Integer;
  RGB,
  ZBuffer       : PByte;
+ Alpha         : PByte;
 
  ExtraData     : Pointer; // First 4 Bytes is always Offset. Anything after is coordinates for placing other GM files onto.
                           // Like a wheel. Note that for convenience we extract the Offset and put it back when saving.
@@ -81,17 +85,22 @@ protected
  procedure ProcessRawData_X(Frame : PGM_Frame);
  procedure ProcessRawData_S(Frame : PGM_Frame);
  procedure ProcessRawData_Z(Frame : PGM_Frame);
+ procedure ProcessRawData_A(Frame : PGM_Frame);
+ procedure ProcessRawData_E(Frame : PGM_Frame);
+ procedure ProcessRawData_Q(Frame : PGM_Frame);
  procedure ProcessRawData(Frame : PGM_Frame);
  procedure MakeRawData_X(var Frame : PGM_Frame);
  procedure MakeRawData_S(var Frame : PGM_Frame);
  procedure MakeRawData_Z(var Frame : PGM_Frame);
+ procedure MakeRawData_A(var Frame : PGM_Frame);
+ procedure MakeRawData_E(var Frame : PGM_Frame);
  procedure MakeRawData(var Frame : PGM_Frame);
- procedure WorkOutDimentions;
  procedure WriteFrame(ID : Integer; Stream : TStream);
  procedure ReadFrame(ID : Integer; Stream : TStream);
  function GetFrame(ID : Integer) : PGM_Frame;
  function GetFrameCount() : Integer;
  function MinMaxRGB(RGB : PByte; Size : Integer) : TMinMax;
+ procedure GetFrameRGBA_TYPE_A(Frame : PGM_Frame; Result : Pointer; OX,OY : Integer);
 public
  constructor Create(GM_Type : Byte);
  destructor Destroy; override;
@@ -110,19 +119,23 @@ public
  function GetFrameTrans(ID : Integer) : PByte;
  function GetFrameZBuffer(ID : Integer) : PByte;
  function GetFrameSideCol(ID : Integer) : PByte;
+ function GetFrameAlpha(ID : Integer) : PByte;
  procedure SetFrameRGB8(ID : Integer; RGB, ZBuffer : PByte);
+ procedure SetFrameRGB(ID : Integer; RGB,Alpha : Pointer);
+
+ procedure WorkOutDimentions;
 
  property Frame[Index : Integer] : PGM_Frame read GetFrame;
  property FrameCount             : Integer   read GetFrameCount;
  property Width                  : Integer   read FW write FW;
  property Height                 : Integer   read FH write FH;
  property GM_Type                : Byte      read FType write FType;
- property LoadOneFrame           : Boolean read FLoadOneFrame write FLoadOneFrame;
+ property LoadOneFrame           : Boolean   read FLoadOneFrame write FLoadOneFrame;
 end;
 
 implementation
 
-uses Math;
+uses Math, OW_Palette;
 
 constructor TGM_File.Create(GM_Type : Byte);
 begin
@@ -151,6 +164,8 @@ begin
   FreeMem(Frame^.RGB);
   if Assigned(Frame^.ZBuffer) then
   FreeMem(Frame^.ZBuffer);
+  if Assigned(Frame^.Alpha) then
+  FreeMem(Frame^.Alpha);
  end;
 
  SetLength(FFrames,0);
@@ -340,7 +355,7 @@ begin
  RGB := Frame^.RGB;
 
  C    := 0;
-
+ try
  While C < Frame^.RawDataSize do
  begin
   if (D^ and $80) = $80 then
@@ -350,6 +365,115 @@ begin
 
   IncD(D,1,C);
  end;
+ except
+  asm nop end;
+ end;
+
+ if (Cardinal(RGB)-Cardinal(Frame^.RGB)) <> Frame^.Size[0]*Frame^.Size[1] then
+ asm nop end;
+
+
+ FreeMem(Frame^.RawData);
+ Frame^.RawData := Nil;
+end;
+
+procedure SetPByteValue(var P : PByte; const Data : Byte);
+begin
+ P^ := Data;
+ Inc(Cardinal(P),1);
+end;
+
+procedure TGM_File.ProcessRawData_A(Frame : PGM_Frame);
+var
+ D,A,RGB : PByte;
+ C,S,X   : Integer;
+ R,G,B   : Byte;
+begin
+ D   := Frame^.RawData;
+ RGB := Frame^.RGB;
+ A   := Frame^.Alpha;
+              
+ C    := 0;
+ try
+ While C < Frame^.RawDataSize do
+ begin
+  if (D^ and $80) = $80 then
+  begin
+   A^ := ((D^ and 15) * 32) - 4;
+   IncD(D,1,C);
+   w5652rgb(Word(Pointer(D)^),r,g,b);
+   IncD(D,2,C);
+   unfadergba(r,g,b,A^);
+   SetPByteValue(RGB,B);
+   SetPByteValue(RGB,G);
+   SetPByteValue(RGB,R);
+   Inc(Cardinal(A),1);
+  end
+  else
+  begin
+   S := D^ and $7f;
+   IncD(D,1,C);
+   if S = 0 then S := 128;
+   Inc(Cardinal(RGB),S*3);
+   Inc(Cardinal(A),S);
+  end;
+ end;
+ except
+  asm nop end;
+ end;
+
+ FreeMem(Frame^.RawData);
+ Frame^.RawData := Nil;
+end;
+
+procedure TGM_File.ProcessRawData_E(Frame : PGM_Frame);
+var
+ D,A,RGB : PByte;
+ C,S,X   : Integer;
+ R,G,B   : Byte;
+begin
+ D   := Frame^.RawData;
+ RGB := Frame^.RGB;
+ A   := Frame^.Alpha;
+              
+ C   := 0;
+ try
+ While C < Frame^.RawDataSize do
+ begin
+  if D^ > 0 then
+  begin
+   A^   := 255;
+   RGB^ := D^;
+  end;           
+
+  Inc(Cardinal(RGB),3);
+  Inc(Cardinal(A),1);
+  IncD(D,1,C);
+ end;
+ except
+  asm nop end;
+ end;
+
+ FreeMem(Frame^.RawData);
+ Frame^.RawData := Nil;
+end;
+
+procedure TGM_File.ProcessRawData_Q(Frame : PGM_Frame);
+var
+ D,A,RGB : PByte;
+ C,S,X   : Integer;
+ R,G,B   : Byte;
+begin
+ D   := Frame^.RawData;
+ RGB := Frame^.RGB;
+
+ if (Frame^.Size[0]*Frame^.Size[1]) <> Frame^.RawDataSize then
+ begin
+  asm nop end;
+  Exit;
+ end;
+
+ CopyMemory(Frame^.RGB,Frame^.RawData,Frame^.RawDataSize);
 
  FreeMem(Frame^.RawData);
  Frame^.RawData := Nil;
@@ -361,6 +485,11 @@ begin
   GM_Type_X : ProcessRawData_X(Frame);
   GM_Type_S : ProcessRawData_S(Frame);
   GM_Type_Z : ProcessRawData_Z(Frame);
+  GM_Type_A : ProcessRawData_A(Frame);
+  GM_Type_E : ProcessRawData_E(Frame);
+  GM_Type_Q : ProcessRawData_Q(Frame);
+ else
+  asm nop end;
  end;
 end;
 
@@ -373,6 +502,7 @@ begin
  Frame^.RGB       := Nil;
  Frame^.RawData   := Nil;
  Frame^.ZBuffer   := Nil;
+ Frame^.Alpha     := Nil;
  Frame^.ExtraData := Nil;
  Frame^.Offset[0] := 0;
  Frame^.Offset[1] := 0;
@@ -394,12 +524,24 @@ begin
  GetMem(Frame^.RawData,Frame^.RawDataSize);
  Stream.Read(Frame^.RawData^,Frame^.RawDataSize);
 
- GetMem(Frame^.RGB,Frame^.Size[0]*Frame^.Size[1]);
- ZeroMemory(Frame^.RGB,Frame^.Size[0]*Frame^.Size[1]);
  if (FType = GM_Type_Z) then
  begin
   GetMem(Frame^.ZBuffer,Frame^.Size[0]*Frame^.Size[1]);
   ZeroMemory(Frame^.ZBuffer,Frame^.Size[0]*Frame^.Size[1]);
+ end;
+
+ if (FType in [GM_Type_A,GM_Type_E]) then
+ begin
+  GetMem(Frame^.Alpha,Frame^.Size[0]*Frame^.Size[1]);
+  ZeroMemory(Frame^.Alpha,Frame^.Size[0]*Frame^.Size[1]);
+
+  GetMem(Frame^.RGB,Frame^.Size[0]*Frame^.Size[1]*3);
+  ZeroMemory(Frame^.RGB,Frame^.Size[0]*Frame^.Size[1]*3);
+ end
+ else
+ begin
+  GetMem(Frame^.RGB,Frame^.Size[0]*Frame^.Size[1]);
+  ZeroMemory(Frame^.RGB,Frame^.Size[0]*Frame^.Size[1]);
  end;
 
  ProcessRawData(Frame);
@@ -466,9 +608,18 @@ begin
   RGB := Pointer(Cardinal(Result) + ((Y+OY)*FW+OX)*3);
   for X := 0 to Frame.Size[0]-1 do
   begin
-   RGB^ := Palette[RGB8^];
+   if FType in [GM_Type_A,GM_Type_E] then
+   begin
+    RGB^ := TRGBTriple(Pointer(RGB8)^);
+    Inc(Cardinal(RGB8),3);
+   end
+   else
+   begin
+    RGB^ := Palette[RGB8^];
+    Inc(Cardinal(RGB8),1);
+   end;
+
    Inc(Cardinal(RGB),3);
-   Inc(Cardinal(RGB8),1);
   end;
  end;
 end;
@@ -502,9 +653,20 @@ begin
   RGB := Pointer(Cardinal(Result) + ((Y+OY)*FW+OX)*2);
   for X := 0 to Frame.Size[0]-1 do
   begin
-   RGB^ := Palette[RGB8^];
+   if FType in [GM_Type_A,GM_Type_E] then
+   begin
+    RGB^ := color_to_hicolor(TRGBTriple(Pointer(RGB8)^));
+    if RGB^ > 0 then
+    asm nop end;
+    Inc(Cardinal(RGB8),3);
+   end
+   else
+   begin
+    RGB^ := Palette[RGB8^];
+    Inc(Cardinal(RGB8),1);
+   end;
+
    Inc(Cardinal(RGB),2);
-   Inc(Cardinal(RGB8),1);
   end;
  end;
 end;
@@ -531,14 +693,20 @@ begin
  else
  TransCol := 255;
 
- RGB8 := Frame.RGB;
+ if FType in [GM_Type_A,GM_Type_E] then
+  RGB8 := Frame.Alpha
+ else
+  RGB8 := Frame.RGB;
  for Y := 0 to Frame.Size[1]-1 do
  begin
   Trans := Pointer(Cardinal(Result) + ((Y+OY)*FW+OX)*1);
   for X := 0 to Frame.Size[0]-1 do
   begin
    if RGB8^ > 0 then
-   Trans^ := TransCol;
+    if FType in [GM_Type_A,GM_Type_E] then
+     Trans^ := RGB8^
+    else
+     Trans^ := TransCol;
    Inc(Cardinal(Trans),1);
    Inc(Cardinal(RGB8),1);
   end;
@@ -575,6 +743,40 @@ begin
    else
     Z^ := 0;
    Inc(Cardinal(Z),1);
+  end;
+ end;
+end;
+
+function TGM_File.GetFrameAlpha(ID : Integer) : PByte;
+var
+ Alpha,
+ A     : PByte;
+ Frame : PGM_Frame;
+ X,Y,
+ OX,OY : Integer;
+begin
+ GetMem(Result,FW*FH);
+ ZeroMemory(Result,FW*FH);
+
+ Frame := @FFrames[ID];
+
+ OX := FW div 2 + Frame.Offset[0];
+ OY := FH div 2 + Frame.Offset[1];
+
+ Alpha := Frame.Alpha;
+ for Y := 0 to Frame.Size[1]-1 do
+ begin
+  A := Pointer(Cardinal(Result) + ((Y+OY)*FW+OX)*1);
+  for X := 0 to Frame.Size[0]-1 do
+  begin
+   if Assigned(Alpha) then
+   begin
+    A^ := Alpha^;
+    Inc(Cardinal(Alpha),1);
+   end
+   else
+    A^ := 0;
+   Inc(Cardinal(A),1);
   end;
  end;
 end;
@@ -617,6 +819,30 @@ begin
  Result.rgbReserved := Alpha;
 end;
 
+procedure TGM_File.GetFrameRGBA_TYPE_A(Frame : PGM_Frame; Result : Pointer; OX,OY : Integer);
+var
+ RGB  : PRGBTriple;
+ RGBA : PRGBQuad;
+ A    : PByte;
+ X,Y  : Integer;
+begin
+ RGB := Pointer(Frame.RGB);
+ A   := Frame.Alpha;
+ for Y := 0 to Frame.Size[1]-1 do
+ begin
+  RGBA := Pointer(Cardinal(Result) + ((Y+OY)*FW+OX)*4);
+  for X := 0 to Frame.Size[0]-1 do
+  begin
+   if A^ > 0 then
+   RGBA^ := RGBTripleToRGBQuad(RGB^,A^);
+
+   Inc(Cardinal(A),1);
+   Inc(Cardinal(RGB),3);
+   Inc(Cardinal(RGBA),4);
+  end;
+ end;
+end;
+
 function TGM_File.GetFrameRGBA(ID : Integer; Palette : TGM_Palette) : PRGBQuad;
 var
  Row   : PRGBQuad;
@@ -641,6 +867,12 @@ begin
 
  OX := FW div 2 + Frame.Offset[0];
  OY := FH div 2 + Frame.Offset[1];
+
+ if FType in [GM_Type_A,GM_Type_E] then
+ begin
+  GetFrameRGBA_TYPE_A(Frame,Result,OX,OY);
+  Exit;
+ end;
 
  RGB8 := Frame.RGB;
  for Y := 0 to Frame.Size[1]-1 do
@@ -752,6 +984,50 @@ begin
  Frame.Offset[1] := Frame.Offset[1]-(FH div 2);
 end;
 
+procedure TGM_File.SetFrameRGB(ID : Integer; RGB,Alpha : Pointer);
+var
+ MM   : TMinMax;
+ SR,SZ,
+ DR,DZ : PByte;
+ Y     : Integer;       
+ Frame : PGM_Frame;
+begin
+ Frame := @FFrames[ID];
+
+ MM := MinMaxRGB(Alpha,FW*FH);
+
+ Frame.Size[0]   := (MM.X[1]-MM.X[0])+1;
+ Frame.Size[1]   := (MM.Y[1]-MM.Y[0])+1;
+ Frame.Offset[0] := MM.X[0];
+ Frame.Offset[1] := MM.Y[0];
+
+ if Assigned(Frame.RGB) then
+ FreeMem(Frame.RGB);
+ if Assigned(Frame.Alpha) then
+ FreeMem(Frame.Alpha);
+ if Assigned(Frame.ExtraData) then
+ FreeMem(Frame.ExtraData);
+ GetMem(Frame.ExtraData,4);
+ Frame.ExtraDataSize := 4;
+
+ GetMem(Frame.RGB,Frame.Size[0]*Frame.Size[1]*3);
+ GetMem(Frame.Alpha,Frame.Size[0]*Frame.Size[1]);
+
+ for Y := 0 to Frame.Size[1]-1 do
+ begin
+  SR := Pointer(Cardinal(RGB)           + ((FW*(Y+Frame.Offset[1]))+Frame.Offset[0])*3);
+  SZ := Pointer(Cardinal(Alpha)         + (FW*(Y+Frame.Offset[1]))+Frame.Offset[0]);
+  DR := Pointer(Cardinal(Frame.RGB)     + Frame.Size[0]*Y*3);
+  DZ := Pointer(Cardinal(Frame.Alpha)   + Frame.Size[0]*Y);
+
+  CopyMemory(DR,SR,Frame.Size[0]*3);
+  CopyMemory(DZ,SZ,Frame.Size[0]);
+ end;
+
+ Frame.Offset[0] := Frame.Offset[0]-(FW div 2);
+ Frame.Offset[1] := Frame.Offset[1]-(FH div 2);
+end;
+
 function TGM_File.GetFrame(ID : Integer) : PGM_Frame;
 begin
  Result := @FFrames[ID];
@@ -764,9 +1040,8 @@ end;
 
 procedure TGM_File.MakeRawData_S(var Frame : PGM_Frame);
 var
- D,RGB,
- LS    : PByte;
- X,C   : Integer;
+ D,RGB : PByte;
+ X,C,S   : Integer;
  Last  : Boolean;
 begin
  GetMem(Frame^.RawData,FW*FH*2{Frame^.Size[0]*Frame^.Size[1]});
@@ -777,19 +1052,29 @@ begin
  Frame^.RawDataSize := 0;
  Last := RGB^ > 0;
  C    := 1;
+ S := 0;
 
  for X := 1 to Frame^.Size[0]*Frame^.Size[1]-1 do
  begin
   Inc(Cardinal(RGB),1);
 
+  if S+C > X then
+  asm nop end;
+
   if (Last = (RGB^ > 0)) then
   begin
    Inc(C);
    if C < 127 then
-   Continue;
+   Continue
+   else
+   begin
+    Dec(C);
+    asm nop end;
+   end;
   end;
 
   D^ := C;
+  Inc(S,D^);
   if Last then
   Inc(D^,128);
 
@@ -799,11 +1084,18 @@ begin
   C    := 1;
  end;
 
+ if S > (Frame^.Size[0]*Frame^.Size[1]) then
+ asm nop end;
+
  D^ := C;
+ Inc(S,D^);
  if Last then
  Inc(D^,128);
 
  IncD(D,1,Frame^.RawDataSize);
+
+ if S <> (Frame^.Size[0]*Frame^.Size[1]) then
+ asm nop end;
 
  ReallocMemory(Frame^.RawData,Frame^.RawDataSize);
 end;
@@ -993,12 +1285,134 @@ begin
  Frame^.RawData := ReallocMemory(Frame^.RawData,Frame^.RawDataSize);
 end;
 
+function GetAlphaZeroLength(var A : PByte; const Max : Byte) : Integer;
+var
+ M : Byte;
+begin
+ Result := 0;
+ M := Max;
+ While (M > 0) and (A^ = 0) do
+ begin
+  Inc(Result);
+  Dec(M);
+  Inc(Cardinal(A),1);
+ end;
+end;
+
+procedure GetRGBValues(var RGB : PByte; var R,G,B : Byte);
+begin
+ R := RGB^;
+ Inc(Cardinal(RGB),1);
+ G := RGB^;
+ Inc(Cardinal(RGB),1);
+ B := RGB^;
+ Inc(Cardinal(RGB),1);
+end;
+
+function FadeRGB(Alpha : Byte; Source : Word) : Word;
+begin
+ case Alpha of
+  0 : Result := 0;
+  1 : Result := (Source and $C718) shr 3;
+  2 : Result := (Source and $E79C) shr 2;
+  3 : Result := (Source and $C718) shr 3 + (Source and $E79C) shr 2;
+  4 : Result := (Source and $F7DE) shr 1;
+  5 : Result := (Source and $C718) shr 3 + (Source and $F7DE) shr 1;
+  6 : Result := (Source and $E79C) shr 2 + (Source and $F7DE) shr 1;
+  7 : Result := Source - (Source and $C718) shr 3;
+  else
+   Result := Source;
+ end;
+end;
+
+procedure TGM_File.MakeRawData_A(var Frame : PGM_Frame);
+var
+ D,RGB,
+ A     : PByte;
+ X,
+ Skip  : Integer;
+ R,G,B,
+ Alpha : Byte;
+begin             
+ Frame^.RawData := Nil;
+ GetMem(Frame^.RawData,FW*FH*4*2);
+
+ D    := Frame^.RawData;
+ RGB  := Frame^.RGB;
+ A    := Frame^.Alpha;
+
+ Frame^.RawDataSize := 0;
+ Skip := 0;
+
+ for X := 0 to Frame^.Size[0]*Frame^.Size[1]-1 do
+ begin
+  if Skip > 0 then
+  begin
+   Dec(Skip);
+   Continue;
+  end;
+
+  if A^ = 0 then
+  begin
+   Skip := GetAlphaZeroLength(A,Max(Min(127,(Frame^.Size[0]*Frame^.Size[1])-X),1));
+   Inc(Cardinal(RGB),Skip*3);
+   D^ := Skip;
+   IncD(D,1,Frame^.RawDataSize);
+   Dec(Skip);
+   Continue;
+  end;
+
+  Alpha := ((A^+4) div 32);
+  Inc(Cardinal(A),1);
+  D^ := $80 + Alpha;
+  IncD(D,1,Frame^.RawDataSize);
+
+  GetRGBValues(RGB,R,G,B);
+  Word(Pointer(D)^) := FadeRGB(Alpha,rgb2w565(B,G,R));//{(Alpha * }rgb2w565(B,G,R){) div 8};
+  IncD(D,2,Frame^.RawDataSize);
+ end;
+
+ Frame^.RawData := ReallocMemory(Frame^.RawData,Frame^.RawDataSize);
+end;
+
+procedure TGM_File.MakeRawData_E(var Frame : PGM_Frame);
+var
+ D,RGB,
+ A  : PByte;
+ X  : Integer;
+begin             
+ Frame^.RawData := Nil;
+ GetMem(Frame^.RawData,FW*FH*2);
+
+ D    := Frame^.RawData;
+ RGB  := Frame^.RGB;
+ A    := Frame^.Alpha;
+
+ Frame^.RawDataSize := 0;
+
+ for X := 0 to Frame^.Size[0]*Frame^.Size[1]-1 do
+ begin
+  if A^ = 0 then
+   D^ := 0
+  else
+   D^ := RGB^;
+
+  IncD(D,1,Frame^.RawDataSize);
+  Inc(Cardinal(A),1);
+  Inc(Cardinal(RGB),3);
+ end;
+
+ Frame^.RawData := ReallocMemory(Frame^.RawData,Frame^.RawDataSize);
+end;
+
 procedure TGM_File.MakeRawData(var Frame : PGM_Frame);
 begin
  case FType of
   GM_Type_X : MakeRawData_X(Frame);
   GM_Type_S : MakeRawData_S(Frame);
   GM_Type_Z : MakeRawData_Z(Frame);
+  GM_Type_A : MakeRawData_A(Frame);
+  GM_Type_E : MakeRawData_E(Frame);
  end;
 end;
 

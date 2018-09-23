@@ -84,9 +84,9 @@ object FrmSaveOptions: TFrmSaveOptions
     end
   end
   object HasSideCols: TCheckBox
-    Left = 208
+    Left = 168
     Top = 232
-    Width = 193
+    Width = 105
     Height = 17
     Caption = 'Has Side Colours'
     Checked = True
@@ -111,6 +111,25 @@ object FrmSaveOptions: TFrmSaveOptions
     Caption = 'Cancel'
     TabOrder = 4
     OnClick = Button1Click
+  end
+  object IsUnitCheck: TCheckBox
+    Left = 272
+    Top = 232
+    Width = 57
+    Height = 17
+    Caption = 'Is Unit'
+    TabOrder = 5
+    OnClick = IsUnitCheckClick
+  end
+  object UnitFallCheck: TCheckBox
+    Left = 336
+    Top = 232
+    Width = 57
+    Height = 17
+    Caption = 'Unit Fall'
+    Enabled = False
+    TabOrder = 6
+    OnClick = IsUnitCheckClick
   end
   object Timer: TTimer
     Enabled = False

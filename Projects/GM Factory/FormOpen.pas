@@ -224,7 +224,11 @@ begin
  LoadGM(AddTrailer(FileDirectory) + Item.Caption,True,Factory);
 
  PNG := TPNGObject.Create;
+ try
  Factory.FrameToPNG(Factory.Frame[0],PNG);
+ except
+  Factory.FrameToPNG(Factory.Frame[0],PNG);
+ end;
  PNGs[Item.ImageIndex] := PNG;
 end;
 
@@ -272,7 +276,11 @@ begin
    Exit;
   end;      }
 
-  GetPNG(Item);
+  try
+   GetPNG(Item);
+  except
+   PNGs[Item.ImageIndex] := Nil;
+  end;
  end;
 
  BuildCheckBMP(192,192);
@@ -291,7 +299,7 @@ end;
 
 function IsValidExt(EXT : AnsiString) : Boolean;
 begin
- Result := (EXT = '.gmf') or (EXT = '.gmz') or (EXT = '.gms') or (EXT = '.gmx');
+ Result := (EXT = '.gmf') or (EXT = '.gmz') or (EXT = '.gms') or (EXT = '.gmx') or (EXT = '.gma') or (EXT = '.gme') or (EXT = '.gmq');
 end;
 
 procedure TFrmOpen.DrawFullPreview;

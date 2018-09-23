@@ -6,11 +6,11 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, GMF, GM_File, ComCtrls, ExtCtrls, pngimage, CheckLst,
   Buttons, PngSpeedButton, ToolWin, Menus, ImgList, PngImageList,
-  VertToolbar, HSLUnit, UndoSystem;
+  VertToolbar, HSLUnit, UndoSystem, ExtDlgs;
 
 const
  APP_TITLE = 'GM Factory';
- APP_VER   = '1.0.0.0';
+ APP_VER   = '1.0.4.0';
  WND_TITLE = APP_TITLE + ' v' + APP_VER;
 
 type
@@ -125,6 +125,33 @@ type
     Cut1: TMenuItem;
     Delete1: TMenuItem;
     Paste1: TMenuItem;
+    ExtraDataPanel: TPanel;
+    ExtraDataList: TListBox;
+    EDPButton: TPngSpeedButton;
+    ToolButton8: TToolButton;
+    EDX: TEdit;
+    EDY: TEdit;
+    EDZ: TEdit;
+    EDAddButton: TPngSpeedButton;
+    EDDeleteButton: TPngSpeedButton;
+    EDEditButton: TPngSpeedButton;
+    ools1: TMenuItem;
+    ChangeOffset1: TMenuItem;
+    OpenDialogGMs: TOpenDialog;
+    CopyExtraData1: TMenuItem;
+    Import1: TMenuItem;
+    N4: TMenuItem;
+    Export1: TMenuItem;
+    AsPNG1: TMenuItem;
+    FromPNGs1: TMenuItem;
+    OpenPNGDialog: TOpenPictureDialog;
+    SavePNGDialog: TSavePictureDialog;
+    MassZBufferChange1: TMenuItem;
+    SHPImport1: TMenuItem;
+    ChangeExtraData1: TMenuItem;
+    Resize1: TMenuItem;
+    N6: TMenuItem;
+    FromPNGPreserveTransparency1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure TrackBarChange(Sender: TObject);
     procedure EditingPanelResize(Sender: TObject);
@@ -184,6 +211,22 @@ type
     procedure Button1Click(Sender: TObject);
     procedure Cut1Click(Sender: TObject);
     procedure Delete1Click(Sender: TObject);
+    procedure EDPButtonClick(Sender: TObject);
+    procedure ExtraDataListClick(Sender: TObject);
+    procedure ExtraDataListKeyPress(Sender: TObject; var Key: Char);
+    procedure EDXKeyPress(Sender: TObject; var Key: Char);
+    procedure EDAddButtonClick(Sender: TObject);
+    procedure EDEditButtonClick(Sender: TObject);
+    procedure EDDeleteButtonClick(Sender: TObject);
+    procedure ChangeOffset1Click(Sender: TObject);
+    procedure CopyExtraData1Click(Sender: TObject);
+    procedure FromPNGs1Click(Sender: TObject);
+    procedure AsPNG1Click(Sender: TObject);
+    procedure MassZBufferChange1Click(Sender: TObject);
+    procedure SHPImport1Click(Sender: TObject);
+    procedure ChangeExtraData1Click(Sender: TObject);
+    procedure Resize1Click(Sender: TObject);
+    procedure FromPNGPreserveTransparency1Click(Sender: TObject);
   private
     { Private declarations }
     procedure FinishedDrawing(FullRedraw : Boolean);
@@ -207,7 +250,15 @@ type
     procedure DrawOnLayer(X,Y : Integer; Left : Boolean);
     procedure SetCaption;
     procedure SetColour(Value : TColor; Col1 : Boolean; NoLumRebuild : Boolean = False);
+    procedure BuildExtraDataList();
+    procedure ImportPNG(KeepTransparency : Boolean);
   end;
+
+const
+ Filter_GMALL : AnsiString = 'All Files (*.gmz;*.gmx;*.gms;*.gma;*.gme)|*.gmz;*.gmx;*.gms;*.gma;*.gme';
+ Filter_GMZ   : AnsiString = '*.gmz|*.gmz';
+ Filter_GMZXA : AnsiString = '*.gmz|*.gmz|*.gmx|*.gmx|*.gma|*.gma|*.gme|*.gme';
+ Filter_SHP   : AnsiString = '*.shp|*.shp';
 
 var
   FrmMain     : TFrmMain;  
@@ -228,7 +279,9 @@ implementation
 {$R *.dfm}
 
 uses OW_Palette, CheckerUnit, CommCtrl, RGBHelper, Math, GMLoader, FormOpen,
-  FormNew, CommDlg, FormSaveOptions, FormAbout, Types, clipbrd, EdUnit;
+  FormNew, CommDlg, FormSaveOptions, FormAbout, Types, clipbrd, EdUnit,
+  FormChangeOffset, FormZBufferChange, FormSHPImport, FormChangeExtraData,
+  FormResize;
 
 type
 TUndo = Record
@@ -391,6 +444,15 @@ begin
  Menu := FrmMain.Reopen1;
 
  Menu.Clear;
+
+ X := 0;
+ if RecentFiles.Count > 0 then
+ Repeat
+  if not FileExists(RecentFiles[X]) then
+   RecentFiles.Delete(X)
+  else
+   Inc(X);
+ Until X = RecentFiles.Count;
 
  for X := 0 to RecentFiles.Count-1 do
  begin
@@ -712,9 +774,36 @@ begin
  Ed.CreateLayerImg(258,EditingPanel,LayerMouseDown,LayerMouseMove);
 end;
 
+procedure TFrmMain.BuildExtraDataList();
+var
+ L : Integer;
+ T : PSmallInt;
+ X,Y,Z : SmallInt;
+begin
+ ExtraDataList.Clear;
+ ExtraDataList.Items.BeginUpdate;
+
+ if (Ed.CurFrame.ExtraDataSize > 0) then
+ begin
+  T := Ed.CurFrame.ExtraData;
+  for L := 0 to (Ed.CurFrame.ExtraDataSize div 6)-1 do
+  begin
+   X := T^+ED.Width div 2;
+   Inc(Cardinal(T),2);
+   Y := T^+Ed.Height div 2;
+   Inc(Cardinal(T),2);
+   Z := T^;
+   Inc(Cardinal(T),2);
+   ExtraDataList.Items.Add(IntToStr(X) + ', ' + IntToStr(Y) + ', ' + IntToStr(Z));
+  end;
+ end;
+
+ ExtraDataList.Items.EndUpdate;
+end;
+
 procedure TFrmMain.TrackBarChange(Sender: TObject);
 var
- L     : Integer;
+ L : Integer;
 begin
  if Ed.Loading or not Assigned(Ed.GMFactory) then Exit;
 
@@ -753,6 +842,10 @@ begin
  LastFrame := TrackBar.Position;
 
  PreviewTimerTimer(Nil);
+
+ BuildExtraDataList();
+ EDEditButton.Enabled := False;
+ EDDeleteButton.Enabled := False;
 
  Ed.Loading := False;
 end;
@@ -848,15 +941,20 @@ begin
 
  SaveAsButton.Enabled       := True;
  SaveAs1.Enabled            := True;
+ Resize1.Enabled            := True;
 
  FakeLevelBackgroundButton.Enabled := True;
 
  Edit1.Visible := True;
  Selection1.Visible := True;
 
+ EDPButton.Enabled := True;
 
  ColorPanel.Enabled         := True;
  EditTypePanel.Enabled      := True;
+
+ Export1.Enabled := True;
+
  MakePaletteImg(PaletteImg,False);
 end;
 
@@ -1339,7 +1437,7 @@ begin
  OpenFile(FrmOpen.Filename);
 end;
 
-procedure SaveAsGM(Filename : AnsiString; UseSideCols : Boolean = True);
+procedure SaveAsGM(Filename : AnsiString; UseSideCols : Boolean = True; IsUnit : Boolean = False; HasHair : Boolean = False);
 var
  GM : TGM_File;
  GMType : Byte;
@@ -1348,7 +1446,8 @@ var
  Frame : PGMFFrame;
  Layer : PGMFLayer;
  Palette : TGMFPalette;
- ZBuffer : PByte;
+ ZBuffer,
+ Z : PByte;
  NoZBuff : Boolean;
  RGB : PByte;
  GMPal : TGM_Palette;
@@ -1357,11 +1456,17 @@ begin
 
  EXT := LowerCase(ExtractFileExt(Filename));
 
+ if EXT = '.gma' then
+  GMType := GM_TYPE_A
+ else
+ if EXT = '.gme' then
+  GMType := GM_TYPE_E
+ else
  if EXT = '.gms' then
   GMType := GM_TYPE_S
  else
  if EXT = '.gmx' then
-  GMType := GM_TYPE_S
+  GMType := GM_TYPE_X
  else
   GMType := GM_TYPE_Z;
 
@@ -1372,32 +1477,57 @@ begin
   GM.Height := Ed.Height;
   GM.AddFrames(Ed.GMFactory.FrameCount);
 
-  Palette := Ed.GMFactory.MakePalette(UseSideCols);
+  Palette := Ed.GMFactory.MakePalette(UseSideCols,IsUnit,HasHair);
 
-  if NoZBuff then
   GetMem(ZBuffer,Ed.Width*Ed.Height);
+  ZeroMemory(ZBuffer,Ed.Width*Ed.Height);
 
   for F := 0 to Ed.GMFactory.FrameCount-1 do
   begin
    Frame := Ed.GMFactory.Frame[F];
 
-   if not NoZBuff then
-   ZBuffer := Frame.ZBuff;
+   if GMType in [GM_TYPE_A,GM_TYPE_E] then
+   begin
+    RGB := Pointer(Ed.GMFactory.GetFrameRGB(Frame));
+     GM.SetFrameRGB(F,RGB,Ed.GMFactory.GetLayer(Frame,0).Trans);
+    FreeMem(RGB);
+   end
+   else
+   begin
+    if Assigned(Frame.ZBuff) then
+     Z := Frame.ZBuff
+    else
+     Z := ZBuffer;
 
-   RGB := Ed.GMFactory.GetFrameWithPalette(Frame,Palette,UseSideCols);
-    GM.SetFrameRGB8(F,RGB,ZBuffer);
-   FreeMem(RGB);
+    RGB := Ed.GMFactory.GetFrameWithPalette(Frame,Palette,UseSideCols);
+     GM.SetFrameRGB8(F,RGB,Z);
+    FreeMem(RGB);
+   end;
+
+   if Frame.ExtraDataSize > 0 then
+   begin
+    if Assigned(GM.Frame[F].ExtraData) then
+    FreeMem(GM.Frame[F].ExtraData);
+
+    GM.Frame[F].ExtraDataSize := Frame.ExtraDataSize+4;
+
+    GetMem(GM.Frame[F].ExtraData,GM.Frame[F].ExtraDataSize);
+    CopyMemory(Pointer(Cardinal(GM.Frame[F].ExtraData)+4),Frame.ExtraData,Frame.ExtraDataSize);
+   end;
   end;
 
-  if NoZBuff then
   FreeMem(ZBuffer);
 
   GM.SaveToFile(Filename);
  GM.Free;
 
- for F := 0 to 255 do
- GMPal[F] := Palette[F];
- SaveOWPalette(ChangeFileExt(Filename,'.p16'),GMPal);
+ if not (GMType in [GM_TYPE_S,GM_TYPE_A,GM_TYPE_E]) then
+ begin
+  for F := 0 to 255 do
+  GMPal[F] := Palette[F];
+
+  SaveOWPalette(ChangeFileExt(Filename,'.p16'),GMPal);
+ end;
 end;
 
 procedure SaveAsGMOptions(Filename : AnsiString);
@@ -1407,7 +1537,7 @@ begin
 
  if not FrmSaveOptions.O then Exit;
 
- SaveAsGM(Filename,FrmSaveOptions.HasSideCols.Checked);
+ SaveAsGM(Filename,FrmSaveOptions.HasSideCols.Checked,FrmSaveOptions.IsUnitCheck.Checked,FrmSaveOptions.UnitFallCheck.Checked);
 end;
 
 function OpenSaveFileDialog(Parent: TWinControl; const DefExt, Filter, InitialDir, Title: string; var FileName: string;
@@ -1486,14 +1616,14 @@ begin
  end
  else
  begin
-  if Lowercase(ExtractFileExt(FileName)) = '.gms' then
+  if (Lowercase(ExtractFileExt(FileName)) = '.gms') or (Lowercase(ExtractFileExt(FileName)) = '.gma') or (Lowercase(ExtractFileExt(FileName)) = '.gme') then
    SaveAsGM(Filename)
   else
    SaveAsGMOptions(Filename);
  end;
 
  SetCaption;
-
+           
  AddToRecent();
 end;
 
@@ -1659,6 +1789,7 @@ begin
   for F := 0 to Ed.GMFactory.FrameCount-1 do
   begin
    Frame := Ed.GMFactory.Frame[F];
+   Frame.Edited := True;
    for L := 1 to Frame.Count do
     Ed.GMFactory.SetupLayer(Ed.GMFactory.GetLayer(Frame,L));
   end;
@@ -1727,7 +1858,10 @@ procedure TFrmMain.ReOpenClick(Sender : TObject);
 begin
  if CheckFileSave() then Exit;
 
- OpenFile(RecentFiles[TMenuItem(Sender).Tag]);
+ if FileExists(RecentFiles[TMenuItem(Sender).Tag]) then
+ OpenFile(RecentFiles[TMenuItem(Sender).Tag])
+ else
+ ShowMessage('Error: File no longer exists!');
 end;
 
 procedure TFrmMain.About1Click(Sender: TObject);
@@ -2149,6 +2283,473 @@ begin
  UndoAddRect(Selection);
  Ed.CurFrame.Edited := True;
  PreviewTimer.Enabled := True;
+end;
+
+procedure TFrmMain.EDPButtonClick(Sender: TObject);
+begin
+ ExtraDataPanel.Visible := EDPButton.Down;
+end;
+
+procedure GetXYZFromEDL(var X,Y,Z : SmallInt);
+var
+ S : AnsiString;
+ P : Integer;
+begin
+ with FrmMain do
+ begin
+  if ExtraDataList.ItemIndex < 0 then Exit;
+  S := ExtraDataList.Items.Strings[ExtraDataList.ItemIndex];
+  P := Pos(',',S);
+  X := StrToIntDef(Copy(S,1,P-1),0);
+  Delete(S,1,P+1);
+  P := Pos(',',S);
+  Y := StrToIntDef(Copy(S,1,P-1),0);
+  Delete(S,1,P+1);
+  Z := StrToIntDef(Trim(S),0);
+ end;
+end;
+
+procedure TFrmMain.ExtraDataListClick(Sender: TObject);
+var
+ X,Y,Z : SmallInt;
+begin
+ EDDeleteButton.Enabled := ExtraDataList.ItemIndex > -1;
+ EDEditButton.Enabled   := EDDeleteButton.Enabled;
+
+ if ExtraDataList.ItemIndex > -1 then
+ begin
+  GetXYZFromEDL(X,Y,Z);
+  EDX.Text := IntToStr(X);
+  EDY.Text := IntToStr(Y);
+  EDZ.Text := IntToStr(Z);
+ end;
+end;
+
+procedure TFrmMain.ExtraDataListKeyPress(Sender: TObject; var Key: Char);
+begin
+ ExtraDataListClick(Sender);
+end;
+
+procedure TFrmMain.EDXKeyPress(Sender: TObject; var Key: Char);
+begin
+ if not (Key in ['0'..'9']) and (Key > #13) then
+ Key := #0;
+end;
+
+procedure TFrmMain.EDAddButtonClick(Sender: TObject);
+var
+ T : PSmallInt;
+begin
+ GetMem(T,Ed.CurFrame.ExtraDataSize+6);
+ ZeroMemory(T,Ed.CurFrame.ExtraDataSize+6);
+
+ if Assigned(Ed.CurFrame.ExtraData) then
+ begin
+  CopyMemory(T,Ed.CurFrame.ExtraData,Ed.CurFrame.ExtraDataSize);
+  FreeMem(Ed.CurFrame.ExtraData);
+ end;
+ Ed.CurFrame.ExtraData := T;
+ T := Pointer(Cardinal(Ed.CurFrame.ExtraData) + ExtraDataList.Items.Count * 6);
+
+ T^ := StrToIntDef(EDX.Text,0)-ED.Width div 2;
+ Inc(Cardinal(T),2);
+ T^ := StrToIntDef(EDY.Text,0)-ED.Height div 2;
+ Inc(Cardinal(T),2);
+ T^ := StrToIntDef(EDZ.Text,0);
+ Inc(Ed.CurFrame.ExtraDataSize,6);
+
+ BuildExtraDataList();
+ ExtraDataList.ItemIndex := ExtraDataList.Items.Count-1;
+ ExtraDataListClick(Nil);
+end;
+
+procedure TFrmMain.EDEditButtonClick(Sender: TObject);
+type
+TThreeSmallInt = Packed Record
+ X,Y,Z : SmallInt;
+end;
+PThreeSmallInt = ^TThreeSmallInt;
+var
+ T : PThreeSmallInt;
+ ID : Integer;
+begin
+ ID := ExtraDataList.ItemIndex;
+ T := Pointer(Cardinal(ED.CurFrame.ExtraData)+ID*6);
+ T^.X := StrToIntDef(EDX.Text,0)-ED.Width div 2;
+ T^.Y := StrToIntDef(EDY.Text,0)-ED.Height div 2;
+ T^.Z := StrToIntDef(EDZ.Text,0);
+
+ ExtraDataList.Items.Strings[ID] := IntToStr(T^.X+ED.Width div 2) + ', ' + IntToStr(T^.Y+ED.Height div 2) + ', ' + IntToStr(T^.Z);
+ ExtraDataList.ItemIndex := ID;
+ ExtraDataListClick(Nil);
+end;
+
+procedure TFrmMain.EDDeleteButtonClick(Sender: TObject);
+var
+ T  : Pointer;
+ ID : Integer;
+begin
+ if ED.CurFrame.ExtraDataSize-6 <= 0 then
+ begin
+  if Assigned(ED.CurFrame.ExtraData) then
+  FreeMem(ED.CurFrame.ExtraData);
+  ED.CurFrame.ExtraDataSize := 0;
+
+  BuildExtraDataList;
+  ExtraDataListClick(Nil);
+  Exit;
+ end;
+
+ Dec(ED.CurFrame.ExtraDataSize,6);
+ GetMem(T,ED.CurFrame.ExtraDataSize);
+
+ if ExtraDataList.ItemIndex > 0 then
+  CopyMemory(T,ED.CurFrame.ExtraData,6*ExtraDataList.ItemIndex);
+
+ if ExtraDataList.ItemIndex+1 < ExtraDataList.Count then
+  CopyMemory(Pointer(Cardinal(T)+6*ExtraDataList.ItemIndex),Pointer(Cardinal(ED.CurFrame.ExtraData)+(ExtraDataList.ItemIndex+1)*6),6*(ExtraDataList.Count-(ExtraDataList.ItemIndex+1)));
+
+ FreeMem(ED.CurFrame.ExtraData);
+ ED.CurFrame.ExtraData := T;
+
+ ID := ExtraDataList.ItemIndex;
+ BuildExtraDataList;
+ ExtraDataList.ItemIndex := Min(ID,ExtraDataList.Count-1);
+ ExtraDataListClick(Nil);
+end;
+
+procedure TFrmMain.ChangeOffset1Click(Sender: TObject);
+begin
+ OpenDialogGMs.Filter := Filter_GMALL;
+ if not OpenDialogGMs.Execute then Exit;
+
+ FrmChangeOffset.LoadGM(OpenDialogGMs.FileName);
+ FrmChangeOffset.ShowModal;
+end;
+
+procedure TFrmMain.CopyExtraData1Click(Sender: TObject);
+var
+ GM,GM2 : TGM_File;
+ FN1,FN2 : AnsiString;
+ F : Integer;
+ FrameA, FrameB : PGM_Frame;
+begin
+ OpenDialogGMs.Filter := Filter_GMALL;
+ if not OpenDialogGMs.Execute then Exit;
+ GM := TGM_File.Create(0);
+  FN1 := OpenDialogGMs.Filename;
+  GM.LoadFromFile(FN1);
+
+ if not OpenDialogGMs.Execute then
+ begin
+  GM.Free;
+  Exit;
+ end;
+
+ GM2 := TGM_File.Create(0);
+  FN2 := OpenDialogGMs.Filename;
+  GM2.LoadFromFile(FN2);
+
+ if GM.FrameCount <> GM2.FrameCount then
+ begin
+  ShowMessage('GM files contain different number of frames! Aborting!');
+  GM.Free;
+  GM2.Free;
+  Exit;
+ end;
+
+ if Messagedlg('Copy Extra Data From ' + ExtractFileName(FN1) + ' to ' + ExtractFileName(FN2) + ' ?',mtError, mbOKCancel, 0) = mrOk then
+ begin
+  for F := 0 to GM.FrameCount-1 do
+  begin
+   FrameA := GM.Frame[F];
+   FrameB := GM2.Frame[F];
+
+   FrameB.ExtraDataSize := FrameA.ExtraDataSize;
+
+   if Assigned(FrameB.ExtraData) then
+   FreeMem(FrameB.ExtraData);
+
+   GetMem(FrameB.ExtraData,FrameB.ExtraDataSize);
+   CopyMemory(FrameB.ExtraData,FrameA.ExtraData,FrameB.ExtraDataSize);
+  end;
+
+  GM2.SaveToFile(FN2);
+ end;
+
+ GM.Free;
+ GM2.Free;
+end;
+
+function IntToStr4Z(Value : Integer) : AnsiString;
+begin
+ Result := IntToStr(Value);
+ while Length(Result) < 4 do
+ Result := '0' + Result;
+end;
+
+procedure FindPNGs(Filename : AnsiString; var List : TStringList);
+var
+ C : Integer;
+ FN : AnsiString;
+begin
+ List := TStringList.Create;
+
+ List.BeginUpdate;
+ Filename := Copy(Filename,1,Length(Filename)-8);
+ C := 0;
+ Repeat
+  FN := Filename + IntToStr4Z(C) + '.png';
+  if not FileExists(FN) then
+  Break;
+
+  List.Add(FN);
+  Inc(C);
+ Until 1 = 2;
+ List.EndUpdate;
+end;
+
+procedure GetSideColFromPNG(Frame : PGMFFrame; FN : AnsiString; PNG : TPNGObject);
+var
+ RGB : PRGBTriple;
+ S   : PByte;
+ Y,X : Integer;
+begin
+ if not FileExists(FN) then Exit;
+
+ PNG.LoadFromFile(FN);
+
+ if not Assigned(Frame.SideCol) then
+ GetMem(Frame.SideCol,PNG.Width*PNG.Height);
+
+ S := Frame.SideCol;
+
+ for Y := 0 to PNG.Height-1 do
+ begin
+  RGB := PNG.Scanline[Y];
+  for X := 0 to PNG.Width-1 do
+  begin
+   if (RGB.rgbtRed = 0) and (RGB.rgbtGreen = 255) and (RGB.rgbtBlue = 0) then
+   S^ := 255
+   else
+   S^ := 0;
+
+   Inc(Cardinal(RGB),3);
+   Inc(Cardinal(S),1);
+  end;
+ end;
+end;
+
+procedure GetZBuffFromPNG(Frame : PGMFFrame; FN : AnsiString; PNG : TPNGObject);
+var
+ RGB : PRGBTriple;
+ Z   : PByte;
+ Y,X : Integer;
+begin
+ if not FileExists(FN) then Exit;
+
+ PNG.LoadFromFile(FN);
+
+ if not Assigned(Frame.ZBuff) then
+ GetMem(Frame.ZBuff,PNG.Width*PNG.Height);
+
+ Z := Frame.ZBuff;
+
+ for Y := 0 to PNG.Height-1 do
+ begin
+  RGB := PNG.Scanline[Y];
+  for X := 0 to PNG.Width-1 do
+  begin
+   Z^ := RGB.rgbtRed;
+
+   Inc(Cardinal(RGB),3);
+   Inc(Cardinal(Z),1);
+  end;
+ end;
+end;
+
+procedure TFrmMain.ImportPNG(KeepTransparency : Boolean);
+var
+ PNG     : TPNGObject;
+ PNGList : TStringList;
+ X,Y     : Integer;
+ Frame   : PGMFFrame;
+ Layer   : PGMFLayer;
+ BMP     : TBitmap;
+ Factory : TGMF;
+ RGB,
+ Alpha     : Pointer;
+begin
+ if CheckFileSave() then Exit;
+
+ if not OpenPNGDialog.Execute then Exit;
+
+ StartLoad;
+  PNG := TPNGObject.Create;
+   PNG.LoadFromFile(OpenPNGDialog.Filename);
+   ED.GMFactory := TGMF.Create(PNG.Width,PNG.Height);
+
+  Factory := ED.GMFactory;
+
+  FindPNGs(OpenPNGDialog.Filename,PNGList);
+
+  Factory.AddFrame(PNGList.Count);
+                                    
+  BMP := TBitmap.Create;
+  BMP.Width  := Factory.Width;
+  BMP.Height := Factory.Height;
+  BMP.PixelFormat := pf16bit;
+
+  for X := 0 to PNGList.Count-1 do
+  begin
+   Frame := ED.GMFactory.Frame[X];
+   Frame.Edited := True;
+   Layer := ED.GetLayer(Frame,1);
+   ED.GMFactory.SetupLayer(Layer);
+
+   PNG.LoadFromFile(PNGList[X]);
+
+   Assert(PNG.Header.ColorType <> COLOR_PALETTE,'Unable to Import COLOR_PALETTE PNGs');
+
+   if not Assigned(PNG.AlphaScanLine[PNG.Height-1]) then
+   PNG.CreateAlpha;
+
+   BMP.Canvas.FillRect(Rect(0,0,BMP.Width,BMP.Height));
+   BMP.Canvas.Draw(0,0,PNG);
+   RGB   := Layer.RGB16;
+   Alpha := Layer.Trans;
+   for Y := 0 to PNG.Height-1 do
+   begin
+    CopyMemory(RGB,BMP.ScanLine[Y],2*PNG.Width);
+    Inc(Cardinal(RGB),2*PNG.Width);
+    CopyMemory(Alpha,PNG.AlphaScanLine[Y],PNG.Width);
+    Inc(Cardinal(Alpha),PNG.Width);
+   end;
+
+   if not KeepTransparency then
+   begin
+    // Fix Alpha
+    Alpha := Layer.Trans;
+    for Y := 0 to PNG.Height*PNG.Width-1 do
+    begin
+     if Byte(Alpha^) <= 100 then
+      Byte(Alpha^) := 0
+     else
+      Byte(Alpha^) := 255;
+     Inc(Cardinal(Alpha),1);
+    end;
+   end;
+
+   GetSideColFromPNG(Frame,ChangeFileExt(PNGList[X],'s.png'),PNG);
+   GetZBuffFromPNG(Frame,ChangeFileExt(PNGList[X],'z.png'),PNG);
+  end;
+
+  BMP.Free;
+  PNG.Free;
+ AfterLoad;
+
+ SaveButton.Enabled := False;
+ Save1.Enabled      := SaveButton.Enabled;
+
+ Ed.Edited   := True;
+ SetCaption;
+end;
+
+procedure TFrmMain.FromPNGs1Click(Sender: TObject);
+begin
+ ImportPNG(False);
+end;
+
+procedure TFrmMain.AsPNG1Click(Sender: TObject);
+var
+ Frame : PGMFFrame;
+ F     : Integer;
+ PNG   : TPNGObject;
+ FN    : AnsiString;
+begin
+ SavePNGDialog.FileName := ChangeFileExt(ED.GMFactory.Filename,'0000.png');
+
+ if not SavePNGDialog.Execute then Exit;
+
+ FN := Copy(SavePNGDialog.FileName,1,Length(SavePNGDialog.FileName)-8);
+
+ PNG := TPNGObject.Create;
+
+ for F := 0 to ED.GMFactory.FrameCount-1 do
+ begin
+  Frame := ED.GMFactory.Frame[F];
+
+  ED.GMFactory.LayerToPNG(Frame,PNG,0);
+  PNG.SaveToFile(FN+IntToStr4Z(F)+'.png');
+
+  ED.GMFactory.SideColToPNG_Actual(Frame,PNG);
+  PNG.SaveToFile(FN+IntToStr4Z(F)+'s.png');
+
+  ED.GMFactory.ZBuffToPNG(Frame,PNG);
+  PNG.SaveToFile(FN+IntToStr4Z(F)+'z.png');
+ end;
+
+ PNG.Free;
+end;
+
+procedure TFrmMain.MassZBufferChange1Click(Sender: TObject);
+begin
+ OpenDialogGMs.Filter := Filter_GMZ;
+
+ if not OpenDialogGMs.Execute then Exit;
+
+ FrmZBufferChange.LoadGM(OpenDialogGMs.FileName);
+ FrmZBufferChange.ShowModal;
+end;
+
+procedure TFrmMain.SHPImport1Click(Sender: TObject);
+var
+ FN1 : AnsiString;
+begin
+ OpenDialogGMs.Filter := Filter_SHP;
+ if not OpenDialogGMs.Execute then Exit;
+ FN1 := OpenDialogGMs.FileName;
+
+ OpenDialogGMs.Filter := Filter_GMZXA;
+ if not OpenDialogGMs.Execute then Exit;
+
+ FrmSHPImport.Load(FN1,OpenDialogGMs.FileName);
+ FrmSHPImport.ShowModal;
+end;
+
+procedure TFrmMain.ChangeExtraData1Click(Sender: TObject);
+begin
+ OpenDialogGMs.Filter := Filter_GMALL;
+ if not OpenDialogGMs.Execute then Exit;
+
+ FrmChangeExtraData.Load(OpenDialogGMs.FileName);
+ FrmChangeExtraData.ShowModal;
+end;
+
+procedure TFrmMain.Resize1Click(Sender: TObject);
+var
+ Zoom : Byte;
+begin
+ FrmResize.ShowModal;
+ if not FrmResize.O then Exit;
+
+ with FrmResize do
+ ED.GMFactory.Resize(LeftValue.Value,TopValue.Value,RightValue.Value,BottomValue.Value);
+
+ ED.Edited := True;
+ Zoom := Ed.Zoom;
+ Ed.Zoom := 0;
+
+ SetZoom(Zoom);
+
+ TrackBarChange(Nil);
+
+ SetCaption;
+end;
+
+procedure TFrmMain.FromPNGPreserveTransparency1Click(Sender: TObject);
+begin
+ ImportPNG(True);
 end;
 
 end.

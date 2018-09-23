@@ -1,6 +1,6 @@
 object FrmMain: TFrmMain
-  Left = 245
-  Top = 87
+  Left = 204
+  Top = 92
   Width = 1136
   Height = 768
   Caption = ' '
@@ -35,18 +35,18 @@ object FrmMain: TFrmMain
     TabOrder = 0
     object LayerPanel: TPanel
       Left = 0
-      Top = 497
+      Top = 608
       Width = 193
-      Height = 192
+      Height = 81
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 0
       DesignSize = (
         193
-        192)
+        81)
       object AddLayerButton: TPngSpeedButton
         Left = 8
-        Top = 159
+        Top = 48
         Width = 23
         Height = 22
         Hint = 'Add Layer'
@@ -167,7 +167,7 @@ object FrmMain: TFrmMain
       end
       object DeleteLayerButton: TPngSpeedButton
         Left = 32
-        Top = 159
+        Top = 48
         Width = 23
         Height = 22
         Hint = 'Delete Layer'
@@ -290,7 +290,7 @@ object FrmMain: TFrmMain
         Left = 8
         Top = 0
         Width = 177
-        Height = 150
+        Height = 39
         HorzScrollBar.Tracking = True
         VertScrollBar.Tracking = True
         Anchors = [akLeft, akTop, akRight, akBottom]
@@ -394,7 +394,7 @@ object FrmMain: TFrmMain
     end
     object ColorPanel: TPanel
       Left = 0
-      Top = 224
+      Top = 335
       Width = 193
       Height = 137
       Align = alTop
@@ -715,7 +715,7 @@ object FrmMain: TFrmMain
     end
     object EditTypePanel: TPanel
       Left = 0
-      Top = 194
+      Top = 305
       Width = 193
       Height = 30
       Align = alTop
@@ -758,7 +758,7 @@ object FrmMain: TFrmMain
     end
     object ColorPanelZBuff: TPanel
       Left = 0
-      Top = 361
+      Top = 472
       Width = 193
       Height = 136
       Align = alTop
@@ -817,6 +817,148 @@ object FrmMain: TFrmMain
         TickMarks = tmBottomRight
         TickStyle = tsNone
         OnChange = ZBuffCol2Change
+      end
+    end
+    object ExtraDataPanel: TPanel
+      Left = 0
+      Top = 194
+      Width = 193
+      Height = 111
+      Align = alTop
+      BevelOuter = bvNone
+      TabOrder = 6
+      Visible = False
+      object EDAddButton: TPngSpeedButton
+        Left = 112
+        Top = 80
+        Width = 23
+        Height = 22
+        OnClick = EDAddButtonClick
+        PngImage.Data = {
+          89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+          610000001974455874536F6674776172650041646F626520496D616765526561
+          647971C9653C000002BD4944415478DAA5935D4893511CC61FA79B2E5147989B
+          1F11393517A2859A14AD297993941012A951E285177D48924965305951525E04
+          F346F1A29412224548574E45243315A4462853E647687EA492B8ED7DA77BCF79
+          DF5E375C507A53FF73713817CFEFFCCFFF3C8F9F2008F89FF2FB1350D37D5B4D
+          795A4828BD422851119E82A364493C37897BB331FFE5D4AE809AEEF23C42F9DA
+          FD4A7564A22A05726908DCBC1B3F9CF318B4F562797565911052DA50D4D2FA17
+          C02BA68D69F1BAE08488644CDA27B0E49A07C77308938521421E8D810933C626
+          AD8CD859D1AB928E561FE0695779ACD876FF11F589A804650AFA16CD6019169C
+          4010141408415C9BFC2634A149F834DE838999A9058E106DDB8D9E690FA0BAB3
+          4CAF50EC33641DCAC5D0CA0738DD0C1886C19D0C83A7BB479FEFC1C5D8219106
+          2043A545536F3D180757D571B3EF8107F0D0546A4BD5E8E236256E4CADDAC477
+          737038ECA83E6DF400AEB55C4288420AC2132488B3D97430300DF74C9A6F7D8C
+          F700F46FAFB29947CFC9271C635873AEA1F2D8E31DBFACACB300A1720592C2D3
+          50F7AEC1D55B31B4C703A86C2B618FA764CBADF651B8E806AA526B760584C842
+          91AC4C87B1BDCED57F77C40BA86829B6A90F6AE2F84001DFEDB360B90D30CB76
+          345C78E3136E95C44F82F8F0C360D759B40C9A2607EF5BBC4F287B7D59BF2161
+          0D67532F6260AE0B1B94838CF7C393EC173E004F05C82401C88CCBC1B30E23D6
+          1DCEAA11FDA87788D79B0B62394AFB9511E151E9EA5318F8D6E91998F8B510E8
+          16428054E20F9D3A07668B0943E35F1744CF682D06EBB4CF48C5CFCF8B46228D
+          D12A65B036311B73EB33985F9B81C0F388D91B8B98D003786F69C7B0759411ED
+          5D248A7F1B69BBF2EBCFE4897EAFA5FE2452A739096558E4D6E598FB390BF397
+          5ED89DECA2282EDD16EF18A65C63965A841472BE3011314CD41326CA93668B61
+          7CF730FD4BFD0276F996F0D72273FA0000000049454E44AE426082}
+      end
+      object EDDeleteButton: TPngSpeedButton
+        Left = 136
+        Top = 80
+        Width = 23
+        Height = 22
+        Enabled = False
+        OnClick = EDDeleteButtonClick
+        PngImage.Data = {
+          89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+          610000001974455874536F6674776172650041646F626520496D616765526561
+          647971C9653C000002954944415478DAA593ED4B536118C6AF33DBD636734C13
+          7599914E320B3243C9425351316C516964122E2A08C5FD0581627F4120414484
+          1A884403732A4A6AA010256192F992DB7CD964BE8496DACE1967E7799E8E130D
+          6B7EA9EBD3CD03D78FFBB9EFEBE61863F81F717F023C566B1223B44202A96462
+          20968282316991803653465A4E3C6F75ED0998AFB1964A9434441C37C5E9D2D2
+          C019F4805F4060D18BD5DE5E7C5F5D59208C584FBF68B3FD05D83413429A220B
+          7275BAB45320AE3160C9038822B87003B8230958B177C133EBF4512259325ABB
+          6D3B00774D4DA2DCF660544E96519B910ED2DF0E5EF0832301A8554A70948189
+          7E20351DDFBADF607EC9ED254CCA3EFFF2ED74103057555DAB3546D5475EBB0A
+          FABE0F84DF802008D82F0ABBE6437C02949979986C7C8A3525EA725E0D3C0C02
+          66AAEF3B620A734C4AC90F7E6E0AD2A80BA1A48AD543119300DF9A80F12F03CE
+          5CDBBBE420C059758F4FB852A2E1A646C0AFAF41FFE05148C0F24D33940603C2
+          CE9CC5C7F64621FFF590360870DCB5F0878BF3359CE313A8DC85A6F6C99E00EE
+          801EEACC7318EA782614B40D6F0126EFDC72C4A4269B344A02C93D03DEFB2374
+          6A140AA8534E62DD2F6262A4C759D4F979EB0B63B7CB6BD5FC46FDA1EB3720F6
+          74802A24043602BB07B8B96E850AFA8B660CDB1EE3A7C8D715778D6F0D71D452
+          9648146CF0A036C21899970BC16E87BC6B304240C0C96E2A23F621E2D265B8FB
+          BB30B73CEE251CCB2EE99C98DE09D27085B99432A9293A3C4A179D570871D605
+          D1E5021529D4C74C50C51F85A7CF8E9995291FE5A84536FF0ED2B63E9417C969
+          941AD4448C8B4FC992D7660CBEF35E379C6303E0897F41365BB7CD218F69B0EC
+          42129302155218AD6494C4CA0705B95E94EB662A492D25DD5FF73EA67FD12FCA
+          BE71F0E82977BB0000000049454E44AE426082}
+      end
+      object EDEditButton: TPngSpeedButton
+        Left = 160
+        Top = 80
+        Width = 23
+        Height = 22
+        Enabled = False
+        OnClick = EDEditButtonClick
+        PngImage.Data = {
+          89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+          610000001974455874536F6674776172650041646F626520496D616765526561
+          647971C9653C000001804944415478DA63FCFFFF3F0325809158039EEED2E7FC
+          FE41E1E1FB978CC2FFFEFE63E2E27DF880879DCD8A68036EAD08F8FFFFAF1483
+          BC6D0203231313C3A58D650CDFDFBE5F4F940140DBFF0B485730B0F0CA013573
+          80C5FEFDF8C07069CBA47F040D0069163199C2C0F0F529C3D3D34718C4952CC1
+          E2CC3C120C57B64FFB81D700986616F60F0C3F9F6E65F8F78D9DE1EED9570CBC
+          7C520C6F9EDD6130CBDFC888D30014CD2FD632FCFFF584814DC28BE1CDD1F30C
+          9F6FDF63502B3CCA88331688D58CD580FD13D4FF5BC5CD214A3386013B3BD580
+          9A673070F17D254A33DC8019C90A0A8A6A6CF7359DBB189EDFDDCEA06BF29328
+          CD700326E7CAFD4F285DCDC0C1C6C9B06B6A12039FCC5F06296D1B86CF37EE32
+          FC78FE8AC1A2F60C56CD2806A497AF63F87C6C2AC39F77F7196E9EBFCAF0E227
+          2303979818834FD7159C9AE106443A09FFAF89F2625034F164F8CEC0CC7065F7
+          7C86CFAF9F10D40C3720C241E43F1B1323839DBA0083042F3B039B28FF3AB7D2
+          A3C18434E34C07A40000C231EE24169034A10000000049454E44AE426082}
+      end
+      object ExtraDataList: TListBox
+        Left = 8
+        Top = 0
+        Width = 177
+        Height = 73
+        BevelKind = bkFlat
+        BorderStyle = bsNone
+        ItemHeight = 13
+        TabOrder = 0
+        OnClick = ExtraDataListClick
+        OnKeyPress = ExtraDataListKeyPress
+      end
+      object EDX: TEdit
+        Left = 8
+        Top = 80
+        Width = 33
+        Height = 21
+        BevelKind = bkFlat
+        BorderStyle = bsNone
+        TabOrder = 1
+        OnKeyPress = EDXKeyPress
+      end
+      object EDY: TEdit
+        Left = 40
+        Top = 80
+        Width = 33
+        Height = 21
+        BevelKind = bkFlat
+        BorderStyle = bsNone
+        TabOrder = 2
+        OnKeyPress = EDXKeyPress
+      end
+      object EDZ: TEdit
+        Left = 72
+        Top = 80
+        Width = 33
+        Height = 21
+        BevelKind = bkFlat
+        BorderStyle = bsNone
+        TabOrder = 3
+        OnKeyPress = EDXKeyPress
       end
     end
   end
@@ -1685,6 +1827,47 @@ object FrmMain: TFrmMain
           0049454E44AE426082}
         PngOptions = [pngBlendOnDisabled, pngGrayscaleOnDisabled]
       end
+      object ToolButton8: TToolButton
+        Left = 371
+        Top = 2
+        Width = 4
+        Caption = 'ToolButton8'
+        ImageIndex = 7
+        Style = tbsSeparator
+      end
+      object EDPButton: TPngSpeedButton
+        Left = 375
+        Top = 2
+        Width = 23
+        Height = 22
+        Hint = 'Show/Hide Extra Data'
+        AllowAllUp = True
+        GroupIndex = 345
+        Enabled = False
+        Flat = True
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = EDPButtonClick
+        PngImage.Data = {
+          89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+          610000001974455874536F6674776172650041646F626520496D616765526561
+          647971C9653C000001B84944415478DA63FCFFFF3F03258031A06045B68D8369
+          E7BB6FFFB9C166FDFBC7F01F88FFFEFB0BA4FF33FCFB0FE4FFFD0BA4FF83E9BF
+          40393EB65F5FAF5F7F5ABEBE3F7C2A63CBEABB7F7979B99948B5F9EEF51BFF26
+          16D83333562DBB43961F5E3F79CC30ABD48191B172F1EDFF6D312A241B90DCBE
+          97616EA5332363C5A29BFFDB63D51832F63330CC7064603871E2043018806100
+          F2379046C720E0EEEECE90D0BA8B6141B51BD0808537FEB7C7A9E3B409399660
+          6C26262686B8C6ED0C8BEA3D19194BE75FFDDF95A0C510B7938161913B03C3C1
+          8307C1B6FFF9F307EE0A64D7800C090E0E6688A9DBCAB0A4C99B91B164EE95FF
+          DD49DA046D45E63333333344D56C6258D6E2C7C85834FBE2FFDE143D86A04D0C
+          0C6B7DFF33ECDAB50B6C3B324677417C7C3C4344D50686156D018C8C79D3CEFC
+          9F98690C962064330CB0B0B0308494AE6158D31DC2C8983BF9D4FF4939A60C1E
+          6B1818B605FD63D8B2650BC3EFDFBFC118643B88468F85F4F47486E0E2550C6B
+          7BC31819B3279EF83F25CF9CE4741058B492617D5F3823282FAC1497950AFB07
+          F2E75F4488FF85D90CF21A285FFC85E60BB04BC066AC02E68570468A7323A506
+          0000FC8F32F0CF56D02C0000000049454E44AE426082}
+        PngOptions = [pngBlendOnDisabled, pngGrayscaleOnDisabled]
+      end
     end
     object VerticalToolBar1: TVerticalToolBar
       Left = 0
@@ -2127,6 +2310,14 @@ object FrmMain: TFrmMain
         object TMenuItem
         end
       end
+      object N6: TMenuItem
+        Caption = '-'
+      end
+      object Resize1: TMenuItem
+        Caption = 'Resize'
+        Enabled = False
+        OnClick = Resize1Click
+      end
       object N1: TMenuItem
         Caption = '-'
       end
@@ -2134,6 +2325,7 @@ object FrmMain: TFrmMain
         Caption = 'Save'
         Enabled = False
         ImageIndex = 2
+        OnClick = SaveButtonClick
       end
       object SaveAs1: TMenuItem
         Caption = 'Save As'
@@ -2142,6 +2334,28 @@ object FrmMain: TFrmMain
         OnClick = SaveAsButtonClick
       end
       object N2: TMenuItem
+        Caption = '-'
+      end
+      object Import1: TMenuItem
+        Caption = 'Import'
+        object FromPNGs1: TMenuItem
+          Caption = 'From PNGs'
+          OnClick = FromPNGs1Click
+        end
+        object FromPNGPreserveTransparency1: TMenuItem
+          Caption = 'From PNGs (Preserve Transparency)'
+          OnClick = FromPNGPreserveTransparency1Click
+        end
+      end
+      object Export1: TMenuItem
+        Caption = 'Export'
+        Enabled = False
+        object AsPNG1: TMenuItem
+          Caption = 'As PNGs'
+          OnClick = AsPNG1Click
+        end
+      end
+      object N4: TMenuItem
         Caption = '-'
       end
       object Exit1: TMenuItem
@@ -2209,6 +2423,29 @@ object FrmMain: TFrmMain
         Caption = 'None'
         ShortCut = 16452
         OnClick = SelectNone1Click
+      end
+    end
+    object ools1: TMenuItem
+      Caption = 'Tools'
+      object ChangeOffset1: TMenuItem
+        Caption = 'Change Offset'
+        OnClick = ChangeOffset1Click
+      end
+      object CopyExtraData1: TMenuItem
+        Caption = 'Copy Extra Data'
+        OnClick = CopyExtraData1Click
+      end
+      object ChangeExtraData1: TMenuItem
+        Caption = 'Change Extra Data'
+        OnClick = ChangeExtraData1Click
+      end
+      object MassZBufferChange1: TMenuItem
+        Caption = 'Mass ZBuffer Change'
+        OnClick = MassZBufferChange1Click
+      end
+      object SHPImport1: TMenuItem
+        Caption = 'SHP Import'
+        OnClick = SHPImport1Click
       end
     end
     object Help1: TMenuItem
@@ -2439,7 +2676,7 @@ object FrmMain: TFrmMain
     DefaultExt = 'gmf'
     Filter = 
       'GM Factory (*.gmf)|*.gmf|GM ZBuffer (*.gmz)|*.gmz|GM X (*.gmx)|*' +
-      '.gmx|GM Shadow (*.gms)|*.gms'
+      '.gmx|GM Shadow (*.gms)|*.gms|GM Alpha (*.gma)|*.gma'
     Left = 888
     Top = 40
   end
@@ -2859,5 +3096,21 @@ object FrmMain: TFrmMain
     OnTimer = SelectionTimerTimer
     Left = 792
     Top = 104
+  end
+  object OpenDialogGMs: TOpenDialog
+    Filter = 'All Files (*.gmz;*.gmx;*.gms)|*.gmz;*.gmx;*.gms'
+    Left = 856
+    Top = 104
+  end
+  object OpenPNGDialog: TOpenPictureDialog
+    Filter = 'Portable Network Graphics (*0000.png)|*0000.png'
+    Left = 856
+    Top = 136
+  end
+  object SavePNGDialog: TSavePictureDialog
+    DefaultExt = '*0000.png'
+    Filter = 'Portable Network Graphics (*0000.png)|*0000.png'
+    Left = 856
+    Top = 168
   end
 end

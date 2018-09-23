@@ -18,7 +18,13 @@ uses
   FormAbout in 'FormAbout.pas' {FrmAbout},
   UndoSystem in '..\..\Source\GM Factory\UndoSystem.pas',
   EdUnit in '..\..\Source\GM Factory\EdUnit.pas',
-  EdLayers in '..\..\Source\GM Factory\EdLayers.pas';
+  EdLayers in '..\..\Source\GM Factory\EdLayers.pas',
+  FormChangeOffset in 'FormChangeOffset.pas' {FrmChangeOffset},
+  FormZBufferChange in '..\OBJToGM\FormZBufferChange.pas' {FrmZBufferChange},
+  SHP in '..\..\Source\GM Factory\SHP.pas',
+  FormSHPImport in 'FormSHPImport.pas' {FrmSHPImport},
+  FormChangeExtraData in 'FormChangeExtraData.pas' {FrmChangeExtraData},
+  FormResize in 'FormResize.pas' {FrmResize};
 
 {$R *.res}
 
@@ -29,5 +35,10 @@ begin
   Application.CreateForm(TFrmNew, FrmNew);
   Application.CreateForm(TFrmSaveOptions, FrmSaveOptions);
   Application.CreateForm(TFrmAbout, FrmAbout);
+  Application.CreateForm(TFrmChangeOffset, FrmChangeOffset);
+  Application.CreateForm(TFrmZBufferChange, FrmZBufferChange);
+  Application.CreateForm(TFrmSHPImport, FrmSHPImport);
+  Application.CreateForm(TFrmChangeExtraData, FrmChangeExtraData);
+  Application.CreateForm(TFrmResize, FrmResize);
   Application.Run;
 end.
